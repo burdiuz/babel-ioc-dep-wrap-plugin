@@ -1,16 +1,19 @@
 {
-  "name": "babel-plugins",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@actualwave/babel-ioc-dep-wrap-plugin",
+  "version": "0.0.1",
+  "description": "Babel plugin that wraps module into container to provide dependencies asynchronously from custom sources.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "cd ./test && node index.js"
   },
   "type": "module",
-  "author": "",
+  "author": "Oleg Galaburda <burdiuz@gmail.com>",
   "license": "ISC",
   "devDependencies": {
     "@babel/core": "^7.15.5",
     "@types/babel__core": "^7.1.16"
+  },
+  "peerDependencies": {
+    "@babel/traverse": "*"
   }
 }

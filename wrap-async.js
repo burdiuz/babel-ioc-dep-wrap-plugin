@@ -1,4 +1,6 @@
-export const wrapWithAsyncFunctionPlugin = (globalRequire = false) => {
+import { generateWrapperGn } from './utils.js';
+
+export const wrapWithAsyncFn = (globalRequire = false) => {
   const funcArg = globalRequire
     ? {
         type: 'AssignmentPattern',
@@ -18,35 +20,7 @@ export const wrapWithAsyncFunctionPlugin = (globalRequire = false) => {
 
   return () => ({
     visitor: {
-      Program(path) {
-        const programBody = path.node.body;
-
-        path.node.body = [
-          {
-            type: 'FunctionDeclaration',
-            generator: false,
-            async: true,
-            params: [funcArg],
-            id: {
-              type: 'Identifier',
-              name: 'initFunction',
-            },
-            body: {
-              type: 'BlockStatement',
-              body: [
-                ...programBody,
-                {
-                  type: 'ReturnStatement',
-                  argument: {
-                    type: 'Identifier',
-                    name: 'exports',
-                  },
-                },
-              ],
-            },
-          },
-        ];
-      },
+      Program: generateWrapperGn(false, true, [funcArg]),
       CallExpression(path) {
         if (
           path.node.callee.name === 'require' &&
@@ -71,4 +45,4 @@ export const wrapWithAsyncFunctionPlugin = (globalRequire = false) => {
   });
 };
 
-export default wrapWithAsyncFunctionPlugin;
+export default wrapWithAsyncFn;

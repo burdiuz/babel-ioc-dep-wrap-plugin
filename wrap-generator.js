@@ -1,37 +1,8 @@
-const isASTRequireCall = (node) =>
-  node.callee.name === 'require' || node.callee.type === 'Import';
+import { isASTRequireCall, generateWrapperGn } from './utils.js';
 
-export const wrapWithGeneratorFunctionPlugin = () => () => ({
+export const wrapWithGeneratorFn = (async = true) => () => ({
   visitor: {
-    Program(path) {
-      const programBody = path.node.body;
-
-      path.node.body = [
-        {
-          type: 'FunctionDeclaration',
-          generator: true,
-          async: true,
-          params: [],
-          id: {
-            type: 'Identifier',
-            name: 'initFunction',
-          },
-          body: {
-            type: 'BlockStatement',
-            body: [
-              ...programBody,
-              {
-                type: 'ReturnStatement',
-                argument: {
-                  type: 'Identifier',
-                  name: 'exports',
-                },
-              },
-            ],
-          },
-        },
-      ];
-    },
+    Program: generateWrapperGn(true, async),
     AwaitExpression(path) {
       if (
         path.node.argument.type === 'CallExpression' &&
