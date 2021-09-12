@@ -7,8 +7,8 @@ export const isNodeModuleWrapper = (node) =>
   node.type === 'FunctionDeclaration' && node.id.name === MODULE_INIT_FN_NAME;
 
 export const validateNesting = (path) => {
-  const parentPath = path.findParent((path) => path.isFunction());
-  if (parentPath && !isNodeModuleWrapper(parentPath.node)) {
+  const parentFn = path.getFunctionParent();
+  if (parentFn && !isNodeModuleWrapper(parentFn.node)) {
     console.log(path.parent);
     throw Error(
       'Sorry, "babel-ioc-dep-wrap-plugin" does not work with nested requires. All require() calls must be located at the top level of the module.',
