@@ -12,7 +12,7 @@ const b = require('b.js');
 
 Result:
 ```javascript
-async function initFunction(require) {
+async function moduleinitFunction(require) {
   await require('init');
   const b = await require('b.js');
   return exports;
@@ -30,7 +30,7 @@ const b = require('b.js');
 
 Result:
 ```javascript
-async function* initFunction() {
+async function* moduleinitFunction() {
   yield {
     require: 'init'
   };
@@ -40,3 +40,9 @@ async function* initFunction() {
   return exports;
 }   
 ```
+
+### Limitations
+ 1. Import declarations cannot be processed, so source must be a CommonJs module. Since import delcarations could be only found in top level/scope of the module, it is a good target for future update.
+ 2. Nested `require()` calls, like `const stuff = (() => require('stuff'))()`, since require calls are being transformed into await calls or generator yields, covering nested require() calls does not seem doable. However, nested dynamic imports are supported with async wrapper, because they return Promise anyway.
+ > This also seems like a target for update, to return a list of such requires if any and warning instead of error. Modules from this list could be pre-loaded and provided immediately.
+ 3. No AMD/UMD wrapping.

@@ -1,8 +1,14 @@
-import { isASTRequireCall, generateWrapperFn } from './utils.js';
+import {
+  isASTRequireCall,
+  generateWrapperFn,
+  importDeclarationFn,
+  validateNesting,
+} from './utils.js';
 
 export const wrapWithGeneratorFn = (async = true) => () => ({
   visitor: {
     Program: generateWrapperFn(true, async),
+    ImportDeclaration: importDeclarationFn,
     AwaitExpression(path) {
       if (
         path.node.argument.type === 'CallExpression' &&
@@ -13,6 +19,8 @@ export const wrapWithGeneratorFn = (async = true) => () => ({
     },
     CallExpression(path) {
       if (isASTRequireCall(path.node)) {
+        validateNesting(path);
+
         path.replaceWith({
           type: 'YieldExpression',
           delegate: false,
