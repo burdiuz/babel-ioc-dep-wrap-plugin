@@ -1,4 +1,4 @@
-import { generateWrapperGn } from './utils.js';
+import { generateWrapperFn } from './utils.js';
 
 export const wrapWithAsyncFn = (globalRequire = false) => {
   const funcArg = globalRequire
@@ -20,7 +20,7 @@ export const wrapWithAsyncFn = (globalRequire = false) => {
 
   return () => ({
     visitor: {
-      Program: generateWrapperGn(false, true, [funcArg]),
+      Program: generateWrapperFn(false, true, [funcArg]),
       CallExpression(path) {
         if (
           path.node.callee.name === 'require' &&

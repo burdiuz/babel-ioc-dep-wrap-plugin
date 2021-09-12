@@ -1,7 +1,7 @@
 export const isASTRequireCall = (node) =>
   node.callee.name === 'require' || node.callee.type === 'Import';
 
-export const generateWrapperGn = (generator, async = true, params = []) => (path) => {
+export const generateWrapperFn = (generator, async = true, params = []) => (path) => {
     const programBody = path.node.body;
 
     path.node.body = [

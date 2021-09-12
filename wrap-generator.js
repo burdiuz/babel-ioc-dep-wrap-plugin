@@ -1,8 +1,8 @@
-import { isASTRequireCall, generateWrapperGn } from './utils.js';
+import { isASTRequireCall, generateWrapperFn } from './utils.js';
 
 export const wrapWithGeneratorFn = (async = true) => () => ({
   visitor: {
-    Program: generateWrapperGn(true, async),
+    Program: generateWrapperFn(true, async),
     AwaitExpression(path) {
       if (
         path.node.argument.type === 'CallExpression' &&
