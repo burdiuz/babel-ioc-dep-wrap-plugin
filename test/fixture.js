@@ -1,3 +1,4 @@
+"use strict";
 // import something from 'something';
 
 const bestStuff = require('stuff');

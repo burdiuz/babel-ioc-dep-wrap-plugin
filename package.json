@@ -1,6 +1,6 @@
 {
   "name": "@actualwave/babel-ioc-dep-wrap-plugin",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Babel plugin that wraps module into container to provide dependencies asynchronously from custom sources.",
   "main": "index.js",
   "scripts": {

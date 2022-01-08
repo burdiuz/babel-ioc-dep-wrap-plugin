@@ -16,12 +16,37 @@ export const validateNesting = (path) => {
   }
 };
 
+const removeUseStrictDirective = (path) => {
+  const indices = [];
+
+  if (!path.node.directives) {
+    return path;
+  }
+
+  path.node.directives = path.node.directives.forEach(
+    ({ value: { value } = {} }, index) => {
+      if (value.value === 'use strict') {
+        indices.push(index);
+      }
+    },
+  );
+
+  indices.reverse();
+  indices.forEach((i) => {
+    path.node.directives.splice(i, 1);
+  });
+
+  return path;
+};
+
 export const generateWrapperFn =
   (generator, async = true, params = []) =>
   (path) => {
     if (isNodeModuleWrapper(path.node.body[0])) {
       return;
     }
+
+    removeUseStrictDirective(path);
 
     const programBody = path.node.body;
 
@@ -32,7 +57,20 @@ export const generateWrapperFn =
           type: 'FunctionDeclaration',
           generator,
           async,
-          params,
+          params: [
+            ...params,
+            {
+              type: 'AssignmentPattern',
+              left: {
+                type: 'Identifier',
+                name: 'exports',
+              },
+              right: {
+                type: 'ObjectExpression',
+                properties: [],
+              },
+            },
+          ],
           id: {
             type: 'Identifier',
             name: MODULE_INIT_FN_NAME,
