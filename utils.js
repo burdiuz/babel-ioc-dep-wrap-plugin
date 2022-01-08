@@ -78,6 +78,42 @@ export const generateWrapperFn =
           body: {
             type: 'BlockStatement',
             body: [
+              {
+                /**
+                 * TODO Instead of adding this variable declaration possibly better to
+                 * modify all "module.exports" to commonjs "exports".
+                 */
+                type: 'VariableDeclaration',
+                declarations: [
+                  {
+                    type: 'VariableDeclarator',
+                    id: {
+                      type: 'Identifier',
+                      name: 'module',
+                    },
+                    init: {
+                      type: 'ObjectExpression',
+                      properties: [
+                        {
+                          type: 'ObjectProperty',
+                          method: false,
+                          computed: false,
+                          shorthand: false,
+                          key: {
+                            type: 'Identifier',
+                            name: 'exports',
+                          },
+                          value: {
+                            type: 'Identifier',
+                            name: 'exports',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+                kind: 'const',
+              },
               ...programBody,
               {
                 type: 'ReturnStatement',
