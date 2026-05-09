@@ -2,6 +2,8 @@
 
 Wraps a CommonJS module's body in a container function so that `require()` calls can be intercepted and resolved asynchronously from a custom source (e.g. over HTTP, from a database, or from a sandboxed registry). Two wrapper variants are provided: one based on `async/await` and one based on generators.
 
+Both wrappers handle ES6 `import` declarations, dynamic `import()` calls, and `require()` calls inside nested functions out of the box — all conversions are enabled by default.
+
 ## Installation
 
 ```bash
@@ -31,15 +33,16 @@ const result = babel.transformSync(sourceCode, {
 
 ## Async Wrapper
 
-`wrapWithAsyncFn(globalRequire?, options?)` wraps the module in an `async function`. Every `require()` call is converted to `await require()`, and dynamic `import()` calls at the top level are converted to `await require()`. A custom `require` function is passed as the first argument at call time, letting you intercept every dependency load.
+`wrapWithAsyncFn(globalRequire?, options?)` wraps the module in an `async function`. Every `require()` call is converted to `await require()` (or `await <requireName>()`), and dynamic `import()` at the top level is converted the same way. A custom resolver function is passed as the first argument at call time, letting you intercept every dependency load.
 
 ### Options
 
 | Argument | Type | Default | Description |
 |---|---|---|---|
-| `globalRequire` | `boolean` | `false` | When `true`, the `require` parameter defaults to the global `require`, allowing fallback to normal resolution. |
-| `options.convertImports` | `boolean` | `false` | When `true`, converts ES6 `import` declarations to `await require()` calls automatically. |
-| `options.hoistNestedRequires` | `boolean` | `false` | When `true`, hoists `require()` calls found inside nested functions to the top of the wrapper instead of throwing. |
+| `globalRequire` | `boolean` | `false` | When `true`, the resolver parameter defaults to the global `require`, allowing fallback to normal Node.js resolution. |
+| `options.requireName` | `string` | `'require'` | Name of the injected resolver parameter and all generated calls. Change this when `require` conflicts with something in the surrounding scope. |
+| `options.convertImports` | `boolean` | `true` | Converts ES6 `import` declarations to `await <requireName>()` calls automatically. Set to `false` to throw on any `import` declaration instead. |
+| `options.hoistNestedRequires` | `boolean` | `true` | Hoists `require()` calls found inside nested functions to the top of the wrapper. Set to `false` to throw on nested `require()` instead. |
 
 ### Example — basic
 
@@ -64,7 +67,32 @@ async function moduleInitFunction(require, exports = {}) {
 }
 ```
 
-### Example — `convertImports: true`
+### Example — `requireName`
+
+```javascript
+// Input
+const b = require('b.js');
+```
+
+```javascript
+// wrapWithAsyncFn(false, { requireName: 'load' })
+async function moduleInitFunction(load, exports = {}) {
+  const module = { exports };
+  const b = await load('b.js');
+  return module.exports;
+}
+```
+
+When `globalRequire: true` is combined with a custom `requireName`, the parameter defaults to the global `require`:
+
+```javascript
+// wrapWithAsyncFn(true, { requireName: 'load' })
+async function moduleInitFunction(load = require, exports = {}) { ... }
+```
+
+### Example — `convertImports`
+
+All five ES6 import forms are converted automatically (enabled by default):
 
 ```javascript
 // Input
@@ -72,7 +100,7 @@ import defaultExport from 'a';
 import { x, y } from 'b';
 import * as ns from 'c';
 import 'd';
-import def, { x } from 'e';
+import def, { z } from 'e';
 ```
 
 ```javascript
@@ -83,10 +111,12 @@ const ns = await require('c');
 await require('d');
 const _import0 = await require('e');
 const def = _import0.default;
-const { x } = _import0;
+const { z } = _import0;
 ```
 
-### Example — `hoistNestedRequires: true`
+### Example — `hoistNestedRequires`
+
+`require()` inside nested functions is lifted to the top of the wrapper (enabled by default):
 
 ```javascript
 // Input
@@ -105,16 +135,17 @@ function process(item) {
 }
 ```
 
+Multiple nested requires each receive a unique variable: `_hoisted0`, `_hoisted1`, etc. Hoisted declarations are placed before all other module code.
+
 ### Dynamic `import()`
 
-Top-level `import()` is converted to `await require()`. Nested `import()` (inside a function) is left as-is since it returns a Promise natively.
+Top-level `import()` and `await import()` are both converted to `await require()`. Nested `import()` is left as-is since it returns a Promise natively.
 
 ```javascript
-// Top-level import() → await require()
 import('lazy-module');          // → await require('lazy-module')
 await import('lazy-module');    // → await require('lazy-module')
 
-// Nested import() → left unchanged
+// Nested — left unchanged
 const fn = async () => { await import('lazy-module'); };
 ```
 
@@ -129,8 +160,8 @@ const fn = async () => { await import('lazy-module'); };
 | Argument | Type | Default | Description |
 |---|---|---|---|
 | `async` | `boolean` | `true` | When `true`, produces `async function*`; when `false`, produces `function*`. |
-| `options.convertImports` | `boolean` | `false` | When `true`, converts ES6 `import` declarations to `yield { require: ... }`. |
-| `options.hoistNestedRequires` | `boolean` | `false` | When `true`, hoists `require()` inside nested functions to the wrapper top. |
+| `options.convertImports` | `boolean` | `true` | Converts ES6 `import` declarations to `yield { require: ... }`. Set to `false` to throw on any `import` declaration instead. |
+| `options.hoistNestedRequires` | `boolean` | `true` | Hoists `require()` inside nested functions to the wrapper top. Set to `false` to throw on nested `require()` instead. |
 
 ### Example — basic
 
@@ -161,7 +192,7 @@ function* moduleInitFunction(exports = {}) {
 }
 ```
 
-### Example — `convertImports: true`
+### Example — `convertImports`
 
 ```javascript
 // Input
@@ -188,7 +219,7 @@ await import('lazy-module');    // → yield { require: 'lazy-module' }
 
 ## Both wrappers — `module.exports` support
 
-Both wrappers inject `const module = { exports }` and return `module.exports`. This means all three CommonJS export patterns work correctly:
+Both wrappers inject `const module = { exports }` and return `module.exports`. All three CommonJS export patterns work correctly:
 
 ```javascript
 exports.foo = 1;           // ✓
@@ -219,7 +250,7 @@ const require = (name) => {
   return asyncRequire(name, exports);
 };
 
-const { myExport } = await require('entry-module');
+const myModule = await require('entry-module');
 ```
 
 ### Generator wrapper — step-through loader
@@ -243,13 +274,23 @@ async function loadModule(name) {
 
 ---
 
-## Limitations
+## Opting out of default behaviour
 
-1. **Nested `require()` calls throw by default.** A `require()` inside an inner function cannot be converted to `await`/`yield` without breaking the surrounding function. Enable `hoistNestedRequires: true` to automatically lift these to the top of the wrapper, or pre-load them before the inner function runs.
+All conversions are on by default. Pass explicit options to disable any of them and restore strict error-throwing behaviour:
 
-2. **ES6 `import` declarations throw by default.** Static imports cannot be placed inside a function body. Enable `convertImports: true` to convert them automatically, or convert them to `require()` calls before running the plugin.
+```javascript
+// Throw on import declarations and nested requires instead of converting/hoisting
+wrapWithAsyncFn(false, { convertImports: false, hoistNestedRequires: false })
+wrapWithGeneratorFn(true, { convertImports: false, hoistNestedRequires: false })
+```
 
-3. **No AMD/UMD wrapping.** Only CommonJS `require()` is handled.
+---
+
+## Known limitations
+
+- **AMD/UMD modules** — only CommonJS `require()` and ES6 `import` are handled.
+- **`await require()` inside nested async functions** — the `await` is preserved; only bare `require()` calls are hoisted.
+- **Nested `import()` is not hoisted** — it returns a Promise natively and is left unchanged.
 
 ---
 

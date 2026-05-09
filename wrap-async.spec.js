@@ -206,6 +206,54 @@ describe('wrapWithAsyncFn', () => {
     });
   });
 
+  describe('requireName option', () => {
+    const transformRN = (code, globalRequire = false) =>
+      transform(code, globalRequire, { requireName: 'load' });
+
+    test('uses custom name as the wrapper parameter', () => {
+      const result = transformRN(`require('x');`);
+      expect(result).toMatch(/moduleInitFunction\(load,/);
+      expect(result).not.toContain('(require,');
+    });
+
+    test('renames require() calls in output to custom name', () => {
+      const result = transformRN(`const x = require('x');`);
+      expect(result).toContain("await load('x')");
+      expect(result).not.toMatch(/await require/);
+    });
+
+    test('renames already-awaited require() to custom name without double-wrapping', () => {
+      const result = transformRN(`await require('x');`);
+      expect(result).toContain("await load('x')");
+      expect(result).not.toMatch(/await require/);
+      expect((result.match(/await/g) || []).length).toBe(1);
+    });
+
+    test('uses custom name in hoisted require declarations', () => {
+      const result = transformRN(`function fn() { require('x'); }`);
+      expect(result).toMatch(/const _hoisted0\s*=\s*await load\(['"]x['"]\)/);
+      expect(result).not.toMatch(/await require/);
+    });
+
+    test('uses custom name in converted import declarations', () => {
+      const result = transformRN(`import foo from 'foo';`);
+      expect(result).toMatch(/await load\(['"]foo['"]\)/);
+      expect(result).not.toMatch(/await require/);
+    });
+
+    test('uses custom name when converting dynamic import() calls', () => {
+      const result = transformRN(`import('x');`);
+      expect(result).toContain("await load('x')");
+      expect(result).not.toMatch(/await require/);
+    });
+
+    test('with globalRequire=true the parameter defaults to the global require', () => {
+      const result = transformRN(`require('x');`, true);
+      expect(result).toMatch(/load\s*=\s*require/);
+      expect(result).toContain("await load('x')");
+    });
+  });
+
   describe('error cases', () => {
     test('throws on ES6 import declaration when convertImports is false', () => {
       expect(() =>

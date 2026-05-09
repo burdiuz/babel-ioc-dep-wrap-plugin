@@ -31,11 +31,11 @@ const removeUseStrictDirective = (path) => {
   return path;
 };
 
-export const makeAwaitRequireExpression = (args) => ({
+export const makeAwaitRequireExpression = (args, calleeName = 'require') => ({
   type: 'AwaitExpression',
   argument: {
     type: 'CallExpression',
-    callee: { type: 'Identifier', name: 'require' },
+    callee: { type: 'Identifier', name: calleeName },
     arguments: args,
   },
 });

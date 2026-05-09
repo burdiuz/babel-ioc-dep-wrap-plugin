@@ -9,15 +9,18 @@ import {
 
 export const wrapWithAsyncFn = (
   globalRequire = false,
-  { convertImports = true, hoistNestedRequires = true } = {},
+  { convertImports = true, hoistNestedRequires = true, requireName = 'require' } = {},
 ) => {
   const funcArg = globalRequire
     ? {
         type: 'AssignmentPattern',
-        left: { type: 'Identifier', name: 'require' },
+        left: { type: 'Identifier', name: requireName },
         right: { type: 'Identifier', name: 'require' },
       }
-    : { type: 'Identifier', name: 'require' };
+    : { type: 'Identifier', name: requireName };
+
+  // Bound maker so all generated calls use the configured name.
+  const makeRequireExpr = (args) => makeAwaitRequireExpression(args, requireName);
 
   const wrapperFn = generateWrapperFn(false, true, [funcArg]);
 
@@ -31,7 +34,7 @@ export const wrapWithAsyncFn = (
         exit(path, state) {
           const fnDecl = path.node.body[0];
           if (fnDecl?.type === 'FunctionDeclaration') {
-            insertHoistedRequires(fnDecl, state.iocPlugin.hoisted, makeAwaitRequireExpression);
+            insertHoistedRequires(fnDecl, state.iocPlugin.hoisted, makeRequireExpr);
           }
         },
       },
@@ -43,14 +46,22 @@ export const wrapWithAsyncFn = (
         }
         const getTempId = () => `_import${state.iocPlugin.importCounter++}`;
         path.replaceWithMultiple(
-          convertImportDeclarationToStatements(path.node, makeAwaitRequireExpression, getTempId),
+          convertImportDeclarationToStatements(path.node, makeRequireExpr, getTempId),
         );
       },
       CallExpression(path, state) {
-        if (
-          path.node.callee.name === 'require' &&
-          path.parent.type !== 'AwaitExpression'
-        ) {
+        if (path.node.callee.name === 'require') {
+          if (path.parent.type === 'AwaitExpression') {
+            // Source already awaited this require() — rename the callee if needed, don't re-wrap.
+            if (requireName !== 'require') {
+              path.replaceWith({
+                type: 'CallExpression',
+                callee: { type: 'Identifier', name: requireName },
+                arguments: path.node.arguments,
+              });
+            }
+            return;
+          }
           if (isNestedRequire(path)) {
             if (hoistNestedRequires) {
               const varName = `_hoisted${state.iocPlugin.hoisted.length}`;
@@ -61,15 +72,26 @@ export const wrapWithAsyncFn = (
             }
             return;
           }
-          path.replaceWith({ type: 'AwaitExpression', argument: path.node });
+          path.replaceWith({
+            type: 'AwaitExpression',
+            argument: {
+              type: 'CallExpression',
+              callee: { type: 'Identifier', name: requireName },
+              arguments: path.node.arguments,
+            },
+          });
         } else if (path.node.callee.type === 'Import') {
-          // Dynamic import() → require(); the resulting require() will be re-visited
-          // and wrapped in await. Nested import() is left as-is (returns Promise natively).
+          // Convert import() directly to await requireName() in one step so it is
+          // not re-processed by the require() branch above. Nested import() is left
+          // as-is since it returns a Promise natively.
           if (!isNestedRequire(path)) {
             path.replaceWith({
-              type: 'CallExpression',
-              callee: { type: 'Identifier', name: 'require' },
-              arguments: path.node.arguments,
+              type: 'AwaitExpression',
+              argument: {
+                type: 'CallExpression',
+                callee: { type: 'Identifier', name: requireName },
+                arguments: path.node.arguments,
+              },
             });
           }
         }

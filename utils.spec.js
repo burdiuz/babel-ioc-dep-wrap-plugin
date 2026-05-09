@@ -92,6 +92,16 @@ describe('makeAwaitRequireExpression', () => {
     const node = makeAwaitRequireExpression([arg]);
     expect(node.argument.arguments[0]).toBe(arg);
   });
+
+  test('uses default callee name "require" when none provided', () => {
+    const node = makeAwaitRequireExpression([str('foo')]);
+    expect(node.argument.callee.name).toBe('require');
+  });
+
+  test('uses custom callee name when provided', () => {
+    const node = makeAwaitRequireExpression([str('foo')], 'load');
+    expect(node.argument.callee.name).toBe('load');
+  });
 });
 
 // ─── makeYieldRequireExpression ──────────────────────────────────────────────
