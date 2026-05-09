@@ -12,7 +12,7 @@ license: ISC
 compatibility: Requires Node.js with @babel/core installed. ESM project (type=module). Tests require Node.js 18+ for --experimental-vm-modules.
 metadata:
   author: Oleg Galaburda
-  version: "0.0.2"
+  version: "0.0.4"
   package: "@actualwave/babel-ioc-dep-wrap-plugin"
 ---
 
@@ -20,7 +20,7 @@ metadata:
 
 This Babel plugin package provides two transformation strategies. Both wrap the entire module body in a container function so that a custom resolver can be injected at call time. All new-feature options default to `true`, making the plugin work on real-world code without any configuration.
 
-- **`wrapWithAsyncFn`** — wraps in `async function moduleInitFunction(require, exports = {})`. Every `require()` becomes `await require()`. Dynamic `import()` at the top level is also converted.
+- **`wrapWithAsyncFn`** — wraps in `async function moduleInitFunction(require, exports = {})` (parameter name configurable via `requireName`). Every `require()` becomes `await require()`. Dynamic `import()` at the top level is also converted.
 - **`wrapWithGeneratorFn`** — wraps in `function* moduleInitFunction(exports = {})`. Every `require()` and top-level `import()` becomes `yield { require: '<name>' }`.
 
 Both wrappers:
@@ -53,8 +53,9 @@ const genResult = babel.transformSync(sourceCode, {
 
 | Argument | Type | Default | Effect |
 |---|---|---|---|
-| `globalRequire` | boolean | `false` | When `true`, adds `= require` default to the `require` parameter so the module can fall back to Node's built-in require. |
-| `options.convertImports` | boolean | `true` | Converts ES6 `import` declarations to `await require()` calls. When `false`, throws on any `import` declaration. |
+| `globalRequire` | boolean | `false` | When `true`, adds `= require` default to the resolver parameter so the module can fall back to Node's built-in require. |
+| `options.requireName` | string | `'require'` | Name used for the injected resolver parameter and all generated calls in the output. |
+| `options.convertImports` | boolean | `true` | Converts ES6 `import` declarations to `await <requireName>()` calls. When `false`, throws on any `import` declaration. |
 | `options.hoistNestedRequires` | boolean | `true` | Lifts `require()` calls inside nested functions to the top of the wrapper. When `false`, throws on any nested `require()`. |
 
 ### `wrapWithGeneratorFn(async?, options?)`
@@ -123,6 +124,25 @@ async function* moduleInitFunction(exports = {}) {
 }
 ```
 
+### Async wrapper — custom `requireName`
+
+```javascript
+// wrapWithAsyncFn(false, { requireName: 'load' })
+// Input: const b = require('b.js');
+async function moduleInitFunction(load, exports = {}) {
+  const module = { exports };
+  const b = await load('b.js');
+  return module.exports;
+}
+```
+
+With `globalRequire: true` the parameter defaults to the global `require` regardless of `requireName`:
+
+```javascript
+// wrapWithAsyncFn(true, { requireName: 'load' })
+async function moduleInitFunction(load = require, exports = {}) { ... }
+```
+
 ### import() — dynamic imports
 
 Both wrappers handle top-level dynamic imports and `await import()`:
@@ -145,7 +165,7 @@ Nested `import()` (inside a function body) is left as-is in both wrappers since 
 
 ### import declaration forms
 
-All five forms are supported when `convertImports` is enabled:
+All five forms are supported when `convertImports` is enabled. Async wrapper output uses `<requireName>` (default `require`):
 
 | Import form | Async wrapper result | Generator wrapper result |
 |---|---|---|
